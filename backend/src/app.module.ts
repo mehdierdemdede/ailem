@@ -5,6 +5,7 @@ import validationSchema from './config/validation.schema';
 import {HealthModule} from './common/infrastructure/health.module';
 import {PrismaModule} from './database/prisma.module';
 import {AuthModule} from './modules/auth/presentation/auth.module';
+import {FamiliesModule} from './modules/families/families.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import {AuthModule} from './modules/auth/presentation/auth.module';
     PrismaModule,
     HealthModule,
     AuthModule,
+    FamiliesModule,
   ],
 })
 export class AppModule {}
