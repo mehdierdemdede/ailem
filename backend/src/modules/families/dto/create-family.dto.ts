@@ -3,16 +3,16 @@ import {IsNumber, IsString, Min} from 'class-validator';
 
 export class CreateFamilyDto {
   @IsString({message: 'Ebeveyn tam adı zorunludur.'})
-  parentFullName: string;
+  parentFullName!: string;
 
   @IsString({message: 'Şehir bilgisi zorunludur.'})
-  city: string;
+  city!: string;
 
   @IsString({message: 'İlçe bilgisi zorunludur.'})
-  district: string;
+  district!: string;
 
   @Type(() => Number)
   @IsNumber({}, {message: 'Çocuk sayısı sayı olmalıdır.'})
   @Min(3, {message: 'Çocuk sayısı en az 3 olmalıdır.'})
-  numberOfChildren: number;
+  numberOfChildren!: number;
 }
