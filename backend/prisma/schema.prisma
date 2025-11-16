@@ -1,3 +1,7 @@
+// After updating this schema, run:
+// npx prisma generate
+// npx prisma migrate dev --name init
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,11 +11,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+model HealthCheckLog {
   id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  message   String
 }
