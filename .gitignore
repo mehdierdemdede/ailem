@@ -21,5 +21,9 @@ build/
 dist/
 
 # React Native
-android/
-ios/
+/android/
+/ios/
+
+# Android binary artifacts
+mobile/android/app/debug.keystore
+mobile/android/gradle/wrapper/gradle-wrapper.jar
