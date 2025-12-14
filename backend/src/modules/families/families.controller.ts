@@ -1,21 +1,25 @@
-import {Body, Controller, Get, Param, Post} from '@nestjs/common';
-import {FamiliesService} from './families.service';
-import {CreateFamilyDto} from './dto/create-family.dto';
+import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { FamiliesService } from './families.service';
+import { Prisma } from '@prisma/client';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('families')
 export class FamiliesController {
-  constructor(private readonly familiesService: FamiliesService) {}
+  constructor(private readonly familiesService: FamiliesService) { }
 
+  @UseGuards(AuthGuard('jwt'))
   @Post()
-  create(@Body() createFamilyDto: CreateFamilyDto) {
-    return this.familiesService.create(createFamilyDto);
+  create(@Request() req: any, @Body() data: Prisma.FamilyDetailsCreateWithoutUserInput) {
+    return this.familiesService.create(req.user.sub, data);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.familiesService.findOne(id);
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me')
+  findMyFamily(@Request() req: any) {
+    return this.familiesService.findByUserId(req.user.sub);
   }
 
+  // Admin only - TODO: Add AdminGuard
   @Get()
   findAll() {
     return this.familiesService.findAll();

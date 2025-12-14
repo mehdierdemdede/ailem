@@ -1,48 +1,44 @@
-import {Injectable} from '@nestjs/common';
-import {CreateFamilyDto} from './dto/create-family.dto';
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from 'src/database/prisma.service';
+import { Prisma, FamilyDetails, VerificationStatus } from '@prisma/client';
 
 @Injectable()
 export class FamiliesService {
-  create(createFamilyDto: CreateFamilyDto) {
-    return {
-      mesaj: 'Aile kaydı başarıyla oluşturuldu.',
-      aile: {
-        id: '1',
-        ebeveynTamAdi: createFamilyDto.parentFullName,
-        sehir: createFamilyDto.city,
-        ilce: createFamilyDto.district,
-        cocukSayisi: createFamilyDto.numberOfChildren,
+  constructor(private prisma: PrismaService) { }
+
+  async create(userId: string, data: Prisma.FamilyDetailsCreateWithoutUserInput): Promise<FamilyDetails> {
+    return this.prisma.familyDetails.create({
+      data: {
+        ...data,
+        userId,
       },
-    };
+    });
   }
 
-  findOne(id: string) {
-    return {
-      id,
-      ebeveynTamAdi: 'Ayşe Yılmaz',
-      sehir: 'İstanbul',
-      ilce: 'Kadıköy',
-      cocukSayisi: 3,
-      aciklama: 'Bu veriler örnek olarak sunulmuştur.',
-    };
+  async findAll(): Promise<FamilyDetails[]> {
+    return this.prisma.familyDetails.findMany({
+      include: { user: true },
+    });
   }
 
-  findAll() {
-    return [
-      {
-        id: '1',
-        ebeveynTamAdi: 'Fatma Demir',
-        sehir: 'Ankara',
-        ilce: 'Çankaya',
-        cocukSayisi: 4,
-      },
-      {
-        id: '2',
-        ebeveynTamAdi: 'Mehmet Kaya',
-        sehir: 'İzmir',
-        ilce: 'Bornova',
-        cocukSayisi: 5,
-      },
-    ];
+  async findOne(id: string): Promise<FamilyDetails | null> {
+    return this.prisma.familyDetails.findUnique({
+      where: { id },
+      include: { user: true, card: true },
+    });
+  }
+
+  async findByUserId(userId: string): Promise<FamilyDetails | null> {
+    return this.prisma.familyDetails.findUnique({
+      where: { userId },
+      include: { card: true },
+    });
+  }
+
+  async updateStatus(id: string, status: VerificationStatus): Promise<FamilyDetails> {
+    return this.prisma.familyDetails.update({
+      where: { id },
+      data: { status },
+    });
   }
 }

@@ -11,6 +11,94 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  familyDetails FamilyDetails?
+}
+
+model FamilyDetails {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  
+  fatherName String
+  motherName String
+  address    String
+  city       String
+  phone      String
+  
+  numberOfChildren Int
+  childrenNames    String[] // Storing simple list of names for now
+
+  status VerificationStatus @default(PENDING)
+  
+  card Card?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Card {
+  id        String   @id @default(cuid())
+  familyId  String   @unique
+  family    FamilyDetails @relation(fields: [familyId], references: [id])
+
+  cardNumber String @unique
+  qrCodeData String // Could be same as cardNumber or a signed token
+  validUntil DateTime?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Partner {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String
+  discount    String   // e.g. "10%", "Free Item"
+  
+  address     String?
+  city        String?
+  website     String?
+  phone       String?
+  
+  logoUrl     String?  // URL to image
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model News {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  imageUrl    String?
+  
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model HealthCheckLog {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
