@@ -24,11 +24,8 @@ export class CardsController {
     // Let's expose a GET endpoint for the user to see their card.
 
     @UseGuards(AuthGuard('jwt'))
-    @Get('my-card')
-    async getMyCard(@Request() req: any) {
-        // This requires resolving family from user.
-        // Since FamiliesService has findByUserId, we should inject FamiliesService here?
-        // Or just use FamiliesController to return card inside family object.
-        return { message: "Access card via /families/me" };
+    @Get('qr-token')
+    async getQrToken(@Request() req: any) {
+        return this.cardsService.generateQrToken(req.user.userId);
     }
 }

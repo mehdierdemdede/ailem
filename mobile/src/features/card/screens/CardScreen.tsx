@@ -1,99 +1,213 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Dimensions, StatusBar, TouchableOpacity, RefreshControl, ScrollView, Alert } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+import LinearGradient from 'react-native-linear-gradient';
 import { useAuth } from '../../auth/AuthContext';
+import client from '../../../services/api/client';
+import { theme } from '../../../theme';
 
-const API_URL = 'http://10.0.2.2:3000';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-export const CardScreen = () => {
+export const CardScreen = ({ navigation }: any) => {
     const { userToken } = useAuth();
     const [family, setFamily] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [qrToken, setQrToken] = useState<string>('');
 
     useEffect(() => {
         fetchCardData();
     }, []);
 
+    useEffect(() => {
+        if (family?.card) {
+            fetchQrToken();
+            const interval = setInterval(fetchQrToken, 45000); // 45s refresh
+            return () => clearInterval(interval);
+        }
+    }, [family]);
+
     const fetchCardData = async () => {
         try {
-            const response = await fetch(`${API_URL}/families/me`, {
-                headers: { 'Authorization': `Bearer ${userToken}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setFamily(data);
-            }
+            const response = await client.get('/families/me');
+            setFamily(response.data);
         } catch (error) {
-            console.error(error);
+            console.error('Error fetching card data:', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
-    if (loading) return <ActivityIndicator size="large" style={{ flex: 1 }} />;
+    const fetchQrToken = async () => {
+        try {
+            const response = await client.get('/cards/qr-token');
+            if (response.data && response.data.token) {
+                setQrToken(response.data.token);
+            }
+        } catch (error) {
+            console.error('Error fetching QR token:', error);
+        }
+    };
 
-    if (!family) {
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchCardData();
+        fetchQrToken();
+    };
+
+    if (loading) {
         return (
-            <View style={styles.container}>
-                <Text style={styles.message}>Could not load family details.</Text>
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={theme.colors.secondary} />
             </View>
         );
     }
 
-    if (family.status === 'PENDING') {
+    const renderContent = () => {
+        if (!family) {
+            return (
+                <View style={styles.stateContainer}>
+                    <Text style={styles.stateTitle}>Aile 3+'a Hoşgeldiniz</Text>
+                    <Text style={styles.stateMessage}>Aile detayları yüklenemedi.</Text>
+                    <TouchableOpacity onPress={onRefresh} style={styles.retryButton}>
+                        <Text style={styles.retryText}>Tekrar Dene</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={() => navigation.navigate('FamilyRegistration')} style={[styles.retryButton, { backgroundColor: theme.colors.primary, marginTop: 20 }]}>
+                        <Text style={styles.retryText}>Aile Başvurusunu Tamamla</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={async () => {
+                        try {
+                            setLoading(true);
+                            await client.post('/families/seed');
+                            await fetchCardData();
+                        } catch (e) {
+                            console.error(e);
+                            setLoading(false);
+                            Alert.alert('Error', 'Failed to seed data');
+                        }
+                    }} style={[styles.retryButton, { backgroundColor: theme.colors.secondary, marginTop: 10 }]}>
+                        <Text style={styles.retryText}>Test Verisi Oluştur (Geliştirici)</Text>
+                    </TouchableOpacity>
+                </View>
+            );
+        }
+
+        if (family.status === 'PENDING') {
+            return (
+                <View style={styles.stateContainer}>
+                    <View style={styles.statusBadgePending}>
+                        <Text style={styles.statusTextPending}>⏳ İnceleme Devam Ediyor</Text>
+                    </View>
+                    <Text style={styles.stateTitle}>Başvuru Alındı</Text>
+                    <Text style={styles.stateMessage}>
+                        Başvurunuz ekibimiz tarafından inceleniyor.
+                        Onaylandığında premium dijital kartınız burada görünecektir.
+                    </Text>
+                </View>
+            );
+        }
+
+        if (family.status === 'REJECTED') {
+            return (
+                <View style={styles.stateContainer}>
+                    <View style={styles.statusBadgeRejected}>
+                        <Text style={styles.statusTextRejected}>❌ Başvuru Reddedildi</Text>
+                    </View>
+                    <Text style={styles.stateTitle}>Durum Güncellemesi</Text>
+                    <Text style={styles.stateMessage}>
+                        Maalesef başvurunuz şu an için onaylanmadı.
+                    </Text>
+                </View>
+            );
+        }
+
+        if (!family.card) {
+            return (
+                <View style={styles.stateContainer}>
+                    <Text style={styles.stateTitle}>Kart Oluşturuluyor...</Text>
+                    <Text style={styles.stateMessage}>
+                        Onaylandı. Kartınız oluşturuluyor.
+                    </Text>
+                </View>
+            );
+        }
+
+        // Active Card UI
         return (
-            <View style={styles.container}>
-                <Text style={styles.title}>Application Pending</Text>
-                <Text style={styles.message}>
-                    Your application is currently under review. Once approved, your digital card will appear here.
+            <View style={styles.cardWrapper}>
+                <LinearGradient
+                    colors={[theme.colors.secondary, '#FB8C00']} // Gold to Orange/Darker Gold
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.card}
+                >
+                    <View style={styles.cardHeader}>
+                        <Text style={styles.cardLabel}>PREMIUM ÜYE</Text>
+                        <Text style={styles.cardBrand}>Aile 3+</Text>
+                    </View>
+
+                    <Text style={styles.memberName}>{family.fatherName} & {family.motherName}</Text>
+
+                    <View style={styles.qrContainer}>
+                        <QRCode
+                            value={qrToken || family.card.qrCodeData}
+                            size={180}
+                            color="black"
+                            backgroundColor="white"
+                        />
+                    </View>
+
+                    <View style={styles.cardFooter}>
+                        <View>
+                            <Text style={styles.cardLabelSmall}>KART NUMARASI</Text>
+                            <Text style={styles.cardNumber}>{family.card.cardNumber}</Text>
+                        </View>
+                        <View>
+                            <Text style={styles.cardLabelSmall}>GEÇERLİLİK TARİHİ</Text>
+                            <Text style={styles.validity}>
+                                {new Date(family.card.validUntil).toLocaleDateString(undefined, { month: '2-digit', year: '2-digit' })}
+                            </Text>
+                        </View>
+                    </View>
+                </LinearGradient>
+
+                <Text style={styles.instructionText}>
+                    Bu QR kodunu anlaşmalı noktalarda göstererek avantajlardan yararlanabilirsiniz.
                 </Text>
-            </View>
-        );
-    }
 
-    if (family.status === 'REJECTED') {
-        return (
-            <View style={styles.container}>
-                <Text style={styles.title}>Application Rejected</Text>
-                <Text style={styles.message}>
-                    Unfortunately, your application was not approved. Please contact support.
-                </Text>
+                <TouchableOpacity onPress={async () => {
+                    try {
+                        setLoading(true);
+                        await client.post('/families/seed');
+                        await fetchCardData();
+                        Alert.alert('Bilgi', 'Bilgiler güncellendi!');
+                    } catch (e) {
+                        console.error(e);
+                        setLoading(false);
+                        Alert.alert('Hata', 'Güncelleme başarısız');
+                    }
+                }} style={{ marginTop: 20, padding: 10 }}>
+                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>Bilgileri Güncelle (Dev)</Text>
+                </TouchableOpacity>
             </View>
         );
-    }
-
-    if (!family.card) {
-        return (
-            <View style={styles.container}>
-                <Text style={styles.title}>No Card Found</Text>
-                <Text style={styles.message}>
-                    Your status is approved but the card has not been generated yet.
-                </Text>
-            </View>
-        );
-    }
+    };
 
     return (
         <View style={styles.container}>
-            <Text style={styles.header}>AilePlus Card</Text>
-
-            <View style={styles.cardContainer}>
-                <Text style={styles.cardTitle}>Family Card</Text>
-                <Text style={styles.cardName}>{family.fatherName} & {family.motherName}</Text>
-
-                <View style={styles.qrContainer}>
-                    <QRCode
-                        value={family.card.qrCodeData}
-                        size={SCREEN_WIDTH * 0.5}
-                    />
-                </View>
-
-                <Text style={styles.cardNumber}>{family.card.cardNumber}</Text>
-                <Text style={styles.validity}>Valid Until: {new Date(family.card.validUntil).toLocaleDateString()}</Text>
-            </View>
-
-            <Text style={styles.infoText}>Show this QR code to partners to claim your discount.</Text>
+            <StatusBar barStyle="light-content" backgroundColor={theme.colors.primary} />
+            <Text style={styles.headerTitle}>Dijital Kartım</Text>
+            <ScrollView
+                contentContainerStyle={styles.scrollContainer}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.secondary} />
+                }
+            >
+                {renderContent()}
+            </ScrollView>
         </View>
     );
 };
@@ -101,75 +215,156 @@ export const CardScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: theme.colors.primary, // Deep Navy Background
+    },
+    loadingContainer: {
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 20,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: theme.colors.primary,
     },
-    header: {
+    headerTitle: {
         fontSize: 28,
-        fontWeight: 'bold',
-        marginBottom: 30,
-        color: '#333',
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontWeight: theme.typography.weight.bold,
+        color: theme.colors.surface,
+        marginTop: 20,
         marginBottom: 10,
-        color: '#333',
-    },
-    message: {
-        fontSize: 16,
         textAlign: 'center',
-        color: '#666',
-        marginTop: 10,
     },
-    cardContainer: {
-        width: '100%',
-        backgroundColor: '#fff',
-        borderRadius: 20,
+    scrollContainer: {
+        flexGrow: 1,
+        justifyContent: 'center',
         padding: 20,
+    },
+    // States
+    stateContainer: {
+        backgroundColor: theme.colors.surface,
+        borderRadius: 20,
+        padding: 30,
         alignItems: 'center',
         elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
     },
-    cardTitle: {
-        fontSize: 18,
-        color: '#666',
-        marginBottom: 5,
-        textTransform: 'uppercase',
+    stateTitle: {
+        fontSize: 22,
+        fontWeight: theme.typography.weight.bold,
+        color: theme.colors.textPrimary,
+        marginBottom: 10,
+        marginTop: 10,
+    },
+    stateMessage: {
+        fontSize: 16,
+        color: theme.colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: 22,
+    },
+    retryButton: {
+        marginTop: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        backgroundColor: theme.colors.primary,
+        borderRadius: 8,
+    },
+    retryText: {
+        color: theme.colors.surface,
+        fontWeight: 'bold',
+    },
+    statusBadgePending: {
+        backgroundColor: '#FFF3E0',
+        paddingHorizontal: 15,
+        paddingVertical: 8,
+        borderRadius: 20,
+    },
+    statusTextPending: {
+        color: '#E65100',
+        fontWeight: 'bold',
+    },
+    statusBadgeRejected: {
+        backgroundColor: '#FFEBEE',
+        paddingHorizontal: 15,
+        paddingVertical: 8,
+        borderRadius: 20,
+    },
+    statusTextRejected: {
+        color: '#C62828',
+        fontWeight: 'bold',
+    },
+    // Card
+    cardWrapper: {
+        alignItems: 'center',
+    },
+    card: {
+        width: '100%',
+        borderRadius: 20,
+        padding: 25,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 15,
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+    },
+    cardLabel: {
+        color: '#FFF8E1',
+        fontSize: 10,
+        fontWeight: '900',
         letterSpacing: 2,
     },
-    cardName: {
-        fontSize: 22,
+    cardBrand: {
+        color: theme.colors.surface,
         fontWeight: 'bold',
+        fontSize: 16,
+        fontStyle: 'italic',
+    },
+    memberName: {
+        fontSize: 22,
+        fontWeight: theme.typography.weight.bold,
+        color: theme.colors.surface,
         marginBottom: 20,
-        color: '#000',
+        textShadowColor: 'rgba(0,0,0,0.1)',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
     },
     qrContainer: {
-        padding: 10,
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        marginVertical: 10,
+        alignSelf: 'center',
+        padding: 15,
+        backgroundColor: 'white',
+        borderRadius: 15,
+        marginBottom: 20,
+        elevation: 5,
+    },
+    cardFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 10,
+    },
+    cardLabelSmall: {
+        color: '#FFF8E1',
+        fontSize: 8,
+        fontWeight: 'bold',
+        marginBottom: 2,
     },
     cardNumber: {
-        marginTop: 10,
-        fontSize: 16,
+        color: theme.colors.surface,
+        fontSize: 14,
         fontFamily: 'monospace',
+        fontWeight: 'bold',
         letterSpacing: 1,
     },
     validity: {
-        marginTop: 5,
-        fontSize: 12,
-        color: '#888',
-    },
-    infoText: {
-        marginTop: 30,
+        color: theme.colors.surface,
         fontSize: 14,
-        color: '#888',
+        fontWeight: 'bold',
+    },
+    instructionText: {
+        marginTop: 30,
+        color: theme.colors.surface,
+        opacity: 0.8,
         textAlign: 'center',
+        fontSize: 14,
+        paddingHorizontal: 20,
     },
 });

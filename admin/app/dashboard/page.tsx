@@ -1,12 +1,12 @@
-import {fetchHealth} from '@/api/health';
+import { fetchHealth } from '@/api/health';
+import { fetchFamilies } from '@/api/families';
+import DashboardClient from '@/components/DashboardClient';
 
 export default async function DashboardPage() {
-  const health = await fetchHealth();
+  const [health, families] = await Promise.all([
+    fetchHealth(),
+    fetchFamilies()
+  ]);
 
-  return (
-    <main className="min-h-screen p-8 font-sans">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
-      <pre className="bg-slate-100 p-4 rounded mt-4 text-sm">{JSON.stringify(health, null, 2)}</pre>
-    </main>
-  );
+  return <DashboardClient initialFamilies={families} health={health} />;
 }

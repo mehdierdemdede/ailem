@@ -1,11 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, StatusBar, RefreshControl, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import client from '../../../services/api/client';
+import { theme } from '../../../theme';
 
-const API_URL = 'http://10.0.2.2:3000';
+interface NewsItem {
+    id: number;
+    title: string;
+    content: string;
+    publishedAt: string;
+    isNew?: boolean;
+}
 
-export const NewsScreen = () => {
-    const [news, setNews] = useState([]);
+export const NewsScreen = ({ navigation }: any) => {
+    const [news, setNews] = useState<NewsItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
         fetchNews();
@@ -13,36 +23,78 @@ export const NewsScreen = () => {
 
     const fetchNews = async () => {
         try {
-            const response = await fetch(`${API_URL}/news`);
-            if (response.ok) {
-                const data = await response.json();
-                setNews(data);
-            }
+            const response = await client.get('/news');
+            setNews(response.data);
         } catch (error) {
             console.error(error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
-    const renderItem = ({ item }: any) => (
-        <View style={styles.card}>
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.date}>{new Date(item.publishedAt).toLocaleDateString()}</Text>
-            <Text style={styles.content}>{item.content}</Text>
-        </View>
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchNews();
+    };
+
+    const renderItem = ({ item }: { item: NewsItem }) => (
+        <TouchableOpacity
+            activeOpacity={0.9}
+            style={styles.card}
+            onPress={() => navigation.navigate('NewsDetail', { newsItem: item })}
+        >
+            <View style={styles.cardHeader}>
+                <View style={styles.dateBadge}>
+                    <Text style={styles.dateText}>
+                        {new Date(item.publishedAt).toLocaleDateString()}
+                    </Text>
+                </View>
+                {/* We'll simulate a 'New' badge logic if needed, or use isNew from API if available */}
+                {item.isNew && (
+                    <View style={styles.newBadge}>
+                        <Text style={styles.newText}>YENİ</Text>
+                    </View>
+                )}
+            </View>
+
+            <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+
+            <View style={styles.accentLine} />
+
+            <Text style={styles.preview} numberOfLines={3}>
+                {item.content}
+            </Text>
+
+            <View style={styles.readMoreContainer}>
+                <Text style={styles.readMoreText}>Devamını Oku →</Text>
+            </View>
+        </TouchableOpacity>
     );
 
-    if (loading) return <ActivityIndicator size="large" style={{ flex: 1 }} />;
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={theme.colors.secondary} />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
-            <Text style={styles.header}>News</Text>
+            <StatusBar barStyle="light-content" backgroundColor={theme.colors.primary} />
+            <Text style={styles.headerTitle}>Fırsatlar & Duyurular</Text>
             <FlatList
                 data={news}
                 renderItem={renderItem}
-                keyExtractor={(item: any) => item.id}
+                keyExtractor={(item) => item.id.toString()}
                 contentContainerStyle={styles.list}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.secondary} />
+                }
+                ListEmptyComponent={
+                    <Text style={styles.emptyText}>Şu an için haber bulunmamaktadır.</Text>
+                }
             />
         </View>
     );
@@ -51,38 +103,101 @@ export const NewsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 10,
-        backgroundColor: '#fff',
+        backgroundColor: theme.colors.background,
     },
-    header: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 10,
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: theme.colors.background,
+    },
+    headerTitle: {
+        fontSize: 28,
+        fontWeight: theme.typography.weight.bold,
+        color: theme.colors.primary,
+        paddingVertical: 20,
         textAlign: 'center',
+        backgroundColor: theme.colors.surface,
+        elevation: 2,
     },
     list: {
+        padding: theme.spacing.screenPadding,
         paddingBottom: 20,
     },
     card: {
-        backgroundColor: '#f9f9f9',
-        padding: 15,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.spacing.cardBorderRadius,
+        padding: theme.spacing.lg,
+        marginBottom: 15,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+        borderLeftWidth: 4,
+        borderLeftColor: theme.colors.secondary, // Gold accent line
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         marginBottom: 10,
-        borderRadius: 8,
+    },
+    dateBadge: {
+        backgroundColor: theme.colors.background,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
         borderWidth: 1,
-        borderColor: '#eee',
+        borderColor: theme.colors.border,
+    },
+    dateText: {
+        color: theme.colors.textSecondary,
+        fontSize: 10,
+        fontWeight: 'bold',
+    },
+    newBadge: {
+        backgroundColor: theme.colors.secondary,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+    },
+    newText: {
+        color: theme.colors.primary,
+        fontSize: 10,
+        fontWeight: 'bold',
     },
     title: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 5,
+        fontSize: theme.typography.size.lg,
+        fontWeight: theme.typography.weight.bold,
+        color: theme.colors.textPrimary,
+        marginBottom: 8,
     },
-    date: {
-        fontSize: 12,
-        color: '#999',
+    accentLine: {
+        height: 2,
+        width: 40,
+        backgroundColor: theme.colors.secondary,
         marginBottom: 10,
     },
-    content: {
-        fontSize: 14,
-        lineHeight: 20,
+    preview: {
+        fontSize: theme.typography.size.md,
+        color: theme.colors.textSecondary,
+        lineHeight: 22,
+        marginBottom: 15,
+    },
+    readMoreContainer: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+    },
+    readMoreText: {
+        color: theme.colors.primary,
+        fontWeight: 'bold',
+        fontSize: theme.typography.size.sm,
+    },
+    emptyText: {
+        textAlign: 'center',
+        color: theme.colors.textSecondary,
+        marginTop: 40,
+        fontSize: theme.typography.size.md,
     },
 });

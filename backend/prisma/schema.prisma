@@ -25,6 +25,7 @@ enum VerificationStatus {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
+  name      String?
   password  String
   role      Role     @default(USER)
   createdAt DateTime @default(now())
@@ -46,6 +47,7 @@ model FamilyDetails {
   
   numberOfChildren Int
   childrenNames    String[] // Storing simple list of names for now
+  registryDocumentUrl String? // Link to "Nüfus Kayıt Örneği"
 
   status VerificationStatus @default(PENDING)
   
@@ -79,6 +81,8 @@ model Partner {
   
   address     String?
   city        String?
+  latitude    Float?
+  longitude   Float?
   website     String?
   phone       String?
   

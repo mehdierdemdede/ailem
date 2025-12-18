@@ -1,4 +1,4 @@
-import {apiFetch} from '@/lib/http';
+import { apiFetch } from '@/lib/http';
 
 type HealthResponse = {
   status: string;
@@ -6,5 +6,5 @@ type HealthResponse = {
 };
 
 export const fetchHealth = async (): Promise<HealthResponse> => {
-  return apiFetch<HealthResponse>('/api/health');
+  return apiFetch<HealthResponse>('/health');
 };

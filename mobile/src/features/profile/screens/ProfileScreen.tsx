@@ -1,31 +1,27 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Button, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView, StatusBar, TouchableOpacity } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../auth/AuthContext';
-
-const API_URL = 'http://10.0.2.2:3000';
+import client from '../../../services/api/client';
+import { theme } from '../../../theme';
+import { IconBell, IconLock, IconShield, IconChevronRight } from '../../../components/Icons';
 
 export const ProfileScreen = () => {
-    const { signOut, userToken } = useAuth();
+    const { signOut } = useAuth();
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        fetchProfile();
-    }, []);
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchProfile();
+        }, [])
+    );
 
     const fetchProfile = async () => {
         try {
-            const response = await fetch(`${API_URL}/families/me`, {
-                headers: {
-                    'Authorization': `Bearer ${userToken}`
-                }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setProfile(data); // Expecting FamilyDetails
-            } else {
-                // Handle 401 or 404
-                // Alert.alert("Error", "Could not fetch profile");
+            const response = await client.get('/families/me');
+            if (response.status === 200) {
+                setProfile(response.data);
             }
         } catch (error) {
             console.error(error);
@@ -34,26 +30,99 @@ export const ProfileScreen = () => {
         }
     };
 
-    if (loading) return <ActivityIndicator size="large" style={{ flex: 1 }} />;
+    const handleLogout = () => {
+        Alert.alert(
+            'Çıkış Yap',
+            'Çıkış yapmak istediğinize emin misiniz?',
+            [
+                { text: 'İptal', style: 'cancel' },
+                { text: 'Çıkış Yap', style: 'destructive', onPress: signOut },
+            ]
+        );
+    };
+
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={theme.colors.secondary} />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>My Profile</Text>
+            <StatusBar barStyle="light-content" backgroundColor={theme.colors.primary} />
+            <Text style={styles.headerTitle}>Profilim</Text>
 
-            {profile ? (
-                <View style={styles.infoContainer}>
-                    <Text style={styles.label}>Father: {profile.fatherName}</Text>
-                    <Text style={styles.label}>Mother: {profile.motherName}</Text>
-                    <Text style={styles.label}>Children: {profile.numberOfChildren}</Text>
-                    <Text style={styles.label}>Status: {profile.status}</Text>
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+                {profile ? (
+                    <View style={styles.profileCard}>
+                        <View style={styles.avatarContainer}>
+                            <Text style={styles.avatarText}>
+                                {profile.fatherName ? profile.fatherName.charAt(0) : 'A'}
+                            </Text>
+                        </View>
+                        <Text style={styles.name}>
+                            {profile.fatherName} & {profile.motherName}
+                        </Text>
+                        <View style={styles.statusBadge}>
+                            <Text style={styles.statusText}>{profile.status}</Text>
+                        </View>
+                        <View style={styles.statsRow}>
+                            <View style={styles.statItem}>
+                                <Text style={styles.statNumber}>{profile.numberOfChildren}</Text>
+                                <Text style={styles.statLabel}>Çocuk</Text>
+                            </View>
+                            <View style={[styles.statItem, styles.statBorder]}>
+                                <Text style={styles.statNumber}>
+                                    {new Date(profile.createdAt).getFullYear()}
+                                </Text>
+                                <Text style={styles.statLabel}>Üyelik Yılı</Text>
+                            </View>
+                        </View>
+                    </View>
+                ) : (
+                    <Text style={styles.emptyText}>Aile detayları bulunamadı.</Text>
+                )}
+
+
+
+
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Ayarlar</Text>
+
+                    <TouchableOpacity style={styles.menuItem}>
+                        <View style={styles.menuItemLeft}>
+                            <IconBell color={theme.colors.primary} size={22} />
+                            <Text style={styles.menuText}>Bildirimler</Text>
+                        </View>
+                        <IconChevronRight color={theme.colors.textSecondary} size={20} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.menuItem}>
+                        <View style={styles.menuItemLeft}>
+                            <IconLock color={theme.colors.primary} size={22} />
+                            <Text style={styles.menuText}>Şifre Değiştir</Text>
+                        </View>
+                        <IconChevronRight color={theme.colors.textSecondary} size={20} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.menuItem}>
+                        <View style={styles.menuItemLeft}>
+                            <IconShield color={theme.colors.primary} size={22} />
+                            <Text style={styles.menuText}>Gizlilik Politikası</Text>
+                        </View>
+                        <IconChevronRight color={theme.colors.textSecondary} size={20} />
+                    </TouchableOpacity>
                 </View>
-            ) : (
-                <Text style={styles.text}>Family details not found.</Text>
-            )}
 
-            <View style={styles.logoutButton}>
-                <Button title="Sign Out" onPress={signOut} color="red" />
-            </View>
+                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                    <Text style={styles.logoutText}>Çıkış Yap</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.versionText}>Versiyon 1.0.0</Text>
+            </ScrollView>
         </View>
     );
 };
@@ -61,31 +130,154 @@ export const ProfileScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 20,
-        backgroundColor: '#fff',
+        backgroundColor: theme.colors.background,
     },
-    title: {
-        fontSize: 24,
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: theme.colors.background,
+    },
+    headerTitle: {
+        fontSize: 28,
+        fontWeight: theme.typography.weight.bold,
+        color: theme.colors.primary,
+        paddingVertical: 20,
+        textAlign: 'center',
+        backgroundColor: theme.colors.surface,
+        elevation: 2,
+    },
+    scrollContent: {
+        padding: theme.spacing.screenPadding,
+    },
+    profileCard: {
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.spacing.cardBorderRadius,
+        padding: theme.spacing.xl,
+        alignItems: 'center',
+        marginBottom: 25,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    avatarContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: theme.colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 15,
+        borderWidth: 2,
+        borderColor: theme.colors.secondary,
+    },
+    avatarText: {
+        fontSize: 32,
         fontWeight: 'bold',
-        marginBottom: 20,
+        color: theme.colors.secondary,
+    },
+    name: {
+        fontSize: theme.typography.size.xl,
+        fontWeight: theme.typography.weight.bold,
+        color: theme.colors.textPrimary,
+        marginBottom: 8,
         textAlign: 'center',
     },
-    infoContainer: {
+    statusBadge: {
+        backgroundColor: '#E3F2FD',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 15,
         marginBottom: 20,
-        padding: 15,
-        backgroundColor: '#f9f9f9',
-        borderRadius: 10,
     },
-    label: {
+    statusText: {
+        color: theme.colors.primary,
+        fontSize: theme.typography.size.sm,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    statsRow: {
+        flexDirection: 'row',
+        width: '100%',
+        borderTopWidth: 1,
+        borderTopColor: theme.colors.border,
+        paddingTop: 15,
+    },
+    statItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    statBorder: {
+        borderLeftWidth: 1,
+        borderLeftColor: theme.colors.border,
+    },
+    statNumber: {
         fontSize: 18,
-        marginBottom: 10,
+        fontWeight: 'bold',
+        color: theme.colors.textPrimary,
     },
-    text: {
+    statLabel: {
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+    },
+    section: {
+        marginBottom: 25,
+    },
+    sectionTitle: {
+        fontSize: theme.typography.size.md,
+        fontWeight: theme.typography.weight.bold,
+        color: theme.colors.textSecondary,
+        marginBottom: 10,
+        marginLeft: 5,
+        textTransform: 'uppercase',
+    },
+    menuItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: theme.colors.surface,
+        padding: 16, // Increased padding
+        marginBottom: 12, // Increased spacing
+        borderRadius: 12, // More rounded
+        borderWidth: 1,
+        borderColor: '#F0F0F0', // Subtle border
+    },
+    menuItemLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 15, // Gap between icon and text
+    },
+    menuText: {
         fontSize: 16,
-        marginBottom: 20,
-        textAlign: 'center',
+        color: theme.colors.textPrimary,
+        fontWeight: '500',
     },
     logoutButton: {
-        marginTop: 'auto',
+        backgroundColor: '#FFEBEE',
+        padding: 15,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#FFCDD2',
+    },
+    logoutText: {
+        color: '#D32F2F',
+        fontSize: theme.typography.size.md,
+        fontWeight: 'bold',
+    },
+    versionText: {
+        textAlign: 'center',
+        color: theme.colors.textSecondary,
+        fontSize: 12,
+        marginBottom: 20,
+    },
+    emptyText: {
+        textAlign: 'center',
+        color: theme.colors.textSecondary,
+        fontSize: 16,
+        marginBottom: 20,
     }
 });
